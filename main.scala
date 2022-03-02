@@ -5,6 +5,9 @@ import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.hadoop.io.IntWritable
 import eCP.Java.SiftDescriptorContainer
 
+val seq_10k = "./SIFT/bigann_query.seq"
+val seq_10m = "./SIFT/10M_samplefile.seq"
+
 /** This function is specificly designed load a file of SIFT descriptonrs into an RDD. 
  * @param sc SparkContext of our master node. 
  * @param fileName Name and path to the file full of SIFT descriptors --  
