@@ -63,6 +63,67 @@ def calcCentroid(id: Int, sifts: Iterable[SiftDescriptorContainer]) : SiftDescri
   centroid
 }
 
+def kmeans(sifts : RDD[SiftDescriptorContainer], k : Int = 100, maxIter : Int = 50, convDist : Double = 0.1) : Unit = {
+  // K-means algorithm terminates when the change in centroid location is smaller than 0.1
+  val convDist = 0.1
+
+  // Init K number of centroids from collection (use seed: 42 to keep it consistent)
+  println(s"Sampling $k centroids from SIFTs collection")
+  var centroids = sifts.takeSample(false, k, 42).sortBy(_.id)
+  println(s"Broadcasting centroids")
+  var bc_centroids = sc.broadcast(centroids)
+
+  // Initialize the stoppers
+  var currDist = Double.PositiveInfinity
+  var counter = 0
+
+  while (counter <= maxIter && convDist <= currDist) {
+    println("------------------------------------------------------------")
+    println(s"- Running K-means iteration $counter")
+
+    val distanceRDD = sifts.map(desc => {
+      val dist_id_pair = bc_centroids.value.map(c => (distance(c, desc), c.id));
+      val dist_id_pair_sorted = dist_id_pair.sortBy(_._1)
+
+      // return value .. what will the new RDD contain?
+        // the <Dist, NN-ID> pair ?
+      //dist_id_pair_sorted(0) 
+        // OR  <Dist, NN-ID, SIFT> tuple?
+      //(dist_id_pair_sorted(0), desc);
+        // OR <NN-ID, SIFT> pair ? 
+      //(dist_id_pair(0)._2, desc)
+        // or if we just want to count "distribution" we can do
+      (dist_id_pair_sorted(0)._2, desc)
+    })
+    
+    // collapse on the id of the centroid
+    val groupedRDD = distanceRDD.groupByKey().sortBy(_._1)
+    
+    // calculate new centroid for each key (any better ideas for a
+    // better id on the centroid than to keep the initial id are welcome)
+    val newCentroids = groupedRDD.map(x => (x._1, calcCentroid(x._1, x._2)))
+                                .map(x => x._2)
+                                .collect
+                                .sortBy(_.id)
+        
+    // calculate the distance to see if we should stop based on convDist
+    // FIXME: this does not work ... I think
+    currDist = newCentroids.zip(bc_centroids.value).map(x => distance(x._1, x._2)).sum
+
+    println("- Unpersisting centroids")
+    bc_centroids.unpersist(true)
+
+    println("- Broadcasting recalculated centroids")
+    bc_centroids = sc.broadcast(newCentroids)
+    // centroids = newCentroids
+
+    println(s"- Current distance $currDist")
+    println(s"- End of iteration $counter")
+
+    counter += 1
+  }
+}
+
 // file locations
 val seq_10k = "./SIFT/bigann_query.seq"
 val seq_10m = "./SIFT/10M_samplefile.seq"
@@ -70,16 +131,3 @@ val seq_10m = "./SIFT/10M_samplefile.seq"
 // load datasets
 val rdd_10m = loadSIFTs(sc, seq_10m)
 val rdd_10k = loadSIFTs(sc, seq_10k)
-
-// choose k random vectors of 128-dimension
-val K = 5
-
-// K-means algorithm terminates when the change in centroid location is smaller than 0.1
-val convDist = 0.1
-var currDist = Double.PositiveInfinity
-
-// number of iterations before halting
-val maxIter = 10
-
-// 0. init K number of centroids from collection (use seed: 42 to keep it consistent)
-var centroids = rdd_10k.takeSample(false, K, 42).sortBy(_.id)
