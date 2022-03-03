@@ -97,7 +97,7 @@ def kmeans(sifts : RDD[SiftDescriptorContainer], k : Int = 100, maxIter : Int = 
     })
     
     // collapse on the id of the centroid
-    val groupedRDD = distanceRDD.groupByKey().sortBy(_._1)
+    val groupedRDD = distanceRDD.groupByKey()
     
     // calculate new centroid for each key (any better ideas for a
     // better id on the centroid than to keep the initial id are welcome)
