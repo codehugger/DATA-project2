@@ -41,8 +41,8 @@ def distance(a: SiftDescriptorContainer,  b: SiftDescriptorContainer) : Int = {
 	return ret;
 }
 
-def centroid(id: Int, sifts: Iterable[SiftDescriptorContainer]) : SiftDescriptorContainer = {
-  // Create a new sift descriptor container to represent the new centroid
+def calcCentroid(id: Int, sifts: Iterable[SiftDescriptorContainer]) : SiftDescriptorContainer = {
+  // Create a container for the new centroid vector
   var a: Array[Int] = new Array[Int](128)
 
   sifts.foreach(sift => {
@@ -52,9 +52,11 @@ def centroid(id: Int, sifts: Iterable[SiftDescriptorContainer]) : SiftDescriptor
     })
   })
 
+  // Create the new SIFT vector to hold the centroid
   val centroid : SiftDescriptorContainer = new SiftDescriptorContainer()
   centroid.id = id
 
+  // find the average for each dimension in the vector
   var siftCount = sifts.size
   centroid.vector = a.map(x => (x/siftCount).toByte)
   
@@ -75,3 +77,9 @@ val K = 5
 // K-means algorithm terminates when the change in centroid location is smaller than 0.1
 val convDist = 0.1
 var currDist = Double.PositiveInfinity
+
+// number of iterations before halting
+val maxIter = 10
+
+// 0. init K number of centroids from collection (use seed: 42 to keep it consistent)
+var centroids = rdd_10k.takeSample(false, K, 42).sortBy(_.id)
