@@ -5,24 +5,32 @@ import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.hadoop.io.IntWritable
 import eCP.Java.SiftDescriptorContainer
 
-val seq_10k = "./SIFT/bigann_query.seq"
-val seq_10m = "./SIFT/10M_samplefile.seq"
+// 0. init K number of centroids from collection (use seed: 42 to keep it consistent)
+var centroids = rdd_10k.takeSample(false, K, 42)
 
-/** This function is specificly designed load a file of SIFT descriptonrs into an RDD. 
- * @param sc SparkContext of our master node. 
- * @param fileName Name and path to the file full of SIFT descriptors --  
- *        format: [hadoop.io.IntWriteable, eCP.Java.SiftDescriptorContainer].
- * @return RDD[eCP.Java.SiftDescriptorContainer] RDD of all the SIFT's in the file (using the key as the SIFT's ID). 
- */
-def loadSIFTs(sc: SparkContext, fileName: String) : RDD[SiftDescriptorContainer] = {
-  // We use the spark context to read the data from a HDFS sequence file, but we need to 
-  // load the hadoop class for the key (IntWriteable) and map it to the ID
-  sc.sequenceFile(fileName, classOf[IntWritable], classOf[SiftDescriptorContainer]).map(it => {
-    // first we map to avoid HDFS reader "re-use-of-writable" issue.
-    val desc : SiftDescriptorContainer = new SiftDescriptorContainer()
-    desc.id = it._2.id
-    // WARNING! --> DeepCopy needed as the Java HDFS reader re-uses the memory :(
-    it._2.vector.copyToArray(desc.vector) 
-    desc
+while (tempDist > convDist) {
+  val distRDD = rdd_10k.map(desc => {
+    val dist_id_pair = centroids.map(c => (distance(c, desc), c.id));
+    val dist_id_pair_sorted = dist_id_pair.sortBy(_._1)
+
+    // return value .. what will the new RDD contain?
+      // the <Dist, NN-ID> pair ?
+    //dist_id_pair_sorted(0) 
+      // OR  <Dist, NN-ID, SIFT> tuple?
+    //(dist_id_pair_sorted(0), desc);
+      // OR <NN-ID, SIFT> pair ? 
+    //(dist_id_pair(0)._2, desc)
+      // or if we just want to count "distribution" we can do
+    (dist_id_pair_sorted(0)._2, desc)
   })
+  
+  // collapse on the id of the centroid
+  val groupedRDD = distRDD.groupByKey()
+  
+  // calculate new centroid for each key (any better ideas for a
+  // better id on the centroid than to keep the initial are welcome)
+  val newCentroids = groupedRDD.map(x => (x._1, centroid(x._1, x._2)))
+
+  // calculate the distance to see if we should stop based on convDist
+  // ...
 }
