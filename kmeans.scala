@@ -48,7 +48,8 @@ def calcCentroid(id: Int, sifts: Iterable[SiftDescriptorContainer]) : SiftDescri
   sifts.foreach(sift => {
     var i = 0
     sift.vector.foreach(x => {
-      a(0) += x
+      a(i) += x
+      i += 1
     })
   })
 
